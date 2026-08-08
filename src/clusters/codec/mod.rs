@@ -149,7 +149,6 @@ pub mod zone_management;
 /// JSON string representation of the decoded value or error message
 pub fn decode_attribute_json(cluster_id: u32, attribute_id: u32, tlv_value: &crate::tlv::TlvItemValue) -> String {
     match cluster_id {
-        0x0000 => alarm_base::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0003 => identify::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0004 => groups::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0006 => on_off::decode_attribute_json(cluster_id, attribute_id, tlv_value),
@@ -200,6 +199,9 @@ pub fn decode_attribute_json(cluster_id: u32, attribute_id: u32, tlv_value: &cra
         0x0062 => scenes::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0064 => temperature_alarm::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0065 => groupcast::decode_attribute_json(cluster_id, attribute_id, tlv_value),
+        0x0071 => resource_monitoring::decode_attribute_json(cluster_id, attribute_id, tlv_value),
+        0x0072 => resource_monitoring::decode_attribute_json(cluster_id, attribute_id, tlv_value),
+        0x0079 => resource_monitoring::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0080 => boolean_state_configuration::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0081 => valve_configuration_control::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0090 => electrical_power_measurement::decode_attribute_json(cluster_id, attribute_id, tlv_value),
@@ -229,7 +231,18 @@ pub fn decode_attribute_json(cluster_id: u32, attribute_id: u32, tlv_value: &cra
         0x0402 => temperature_measurement::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0403 => pressure_measurement::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0404 => flow_measurement::decode_attribute_json(cluster_id, attribute_id, tlv_value),
+        0x0405 => water_content_measurement::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0406 => occupancy_sensing::decode_attribute_json(cluster_id, attribute_id, tlv_value),
+        0x040C => concentration_measurement::decode_attribute_json(cluster_id, attribute_id, tlv_value),
+        0x040D => concentration_measurement::decode_attribute_json(cluster_id, attribute_id, tlv_value),
+        0x0413 => concentration_measurement::decode_attribute_json(cluster_id, attribute_id, tlv_value),
+        0x0415 => concentration_measurement::decode_attribute_json(cluster_id, attribute_id, tlv_value),
+        0x042A => concentration_measurement::decode_attribute_json(cluster_id, attribute_id, tlv_value),
+        0x042B => concentration_measurement::decode_attribute_json(cluster_id, attribute_id, tlv_value),
+        0x042C => concentration_measurement::decode_attribute_json(cluster_id, attribute_id, tlv_value),
+        0x042D => concentration_measurement::decode_attribute_json(cluster_id, attribute_id, tlv_value),
+        0x042E => concentration_measurement::decode_attribute_json(cluster_id, attribute_id, tlv_value),
+        0x042F => concentration_measurement::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0430 => soil_measurement::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0450 => network_identity_management::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0451 => wifi_network_management::decode_attribute_json(cluster_id, attribute_id, tlv_value),
@@ -278,7 +291,6 @@ pub fn decode_attribute_json(cluster_id: u32, attribute_id: u32, tlv_value: &cra
 /// Vector of tuples containing (attribute_id, attribute_name) or empty vector if unsupported
 pub fn get_attribute_list(cluster_id: u32) -> Vec<(u32, &'static str)> {
     match cluster_id {
-        0x0000 => alarm_base::get_attribute_list(),
         0x0003 => identify::get_attribute_list(),
         0x0004 => groups::get_attribute_list(),
         0x0006 => on_off::get_attribute_list(),
@@ -329,6 +341,9 @@ pub fn get_attribute_list(cluster_id: u32) -> Vec<(u32, &'static str)> {
         0x0062 => scenes::get_attribute_list(),
         0x0064 => temperature_alarm::get_attribute_list(),
         0x0065 => groupcast::get_attribute_list(),
+        0x0071 => resource_monitoring::get_attribute_list(),
+        0x0072 => resource_monitoring::get_attribute_list(),
+        0x0079 => resource_monitoring::get_attribute_list(),
         0x0080 => boolean_state_configuration::get_attribute_list(),
         0x0081 => valve_configuration_control::get_attribute_list(),
         0x0090 => electrical_power_measurement::get_attribute_list(),
@@ -358,7 +373,18 @@ pub fn get_attribute_list(cluster_id: u32) -> Vec<(u32, &'static str)> {
         0x0402 => temperature_measurement::get_attribute_list(),
         0x0403 => pressure_measurement::get_attribute_list(),
         0x0404 => flow_measurement::get_attribute_list(),
+        0x0405 => water_content_measurement::get_attribute_list(),
         0x0406 => occupancy_sensing::get_attribute_list(),
+        0x040C => concentration_measurement::get_attribute_list(),
+        0x040D => concentration_measurement::get_attribute_list(),
+        0x0413 => concentration_measurement::get_attribute_list(),
+        0x0415 => concentration_measurement::get_attribute_list(),
+        0x042A => concentration_measurement::get_attribute_list(),
+        0x042B => concentration_measurement::get_attribute_list(),
+        0x042C => concentration_measurement::get_attribute_list(),
+        0x042D => concentration_measurement::get_attribute_list(),
+        0x042E => concentration_measurement::get_attribute_list(),
+        0x042F => concentration_measurement::get_attribute_list(),
         0x0430 => soil_measurement::get_attribute_list(),
         0x0450 => network_identity_management::get_attribute_list(),
         0x0451 => wifi_network_management::get_attribute_list(),
@@ -398,7 +424,6 @@ pub fn get_attribute_list(cluster_id: u32) -> Vec<(u32, &'static str)> {
 
 pub fn get_command_list(cluster_id: u32) -> Vec<(u32, &'static str)> {
     match cluster_id {
-        0x0000 => alarm_base::get_command_list(),
         0x0003 => identify::get_command_list(),
         0x0004 => groups::get_command_list(),
         0x0006 => on_off::get_command_list(),
@@ -433,6 +458,9 @@ pub fn get_command_list(cluster_id: u32) -> Vec<(u32, &'static str)> {
         0x0062 => scenes::get_command_list(),
         0x0064 => temperature_alarm::get_command_list(),
         0x0065 => groupcast::get_command_list(),
+        0x0071 => resource_monitoring::get_command_list(),
+        0x0072 => resource_monitoring::get_command_list(),
+        0x0079 => resource_monitoring::get_command_list(),
         0x0080 => boolean_state_configuration::get_command_list(),
         0x0081 => valve_configuration_control::get_command_list(),
         0x0094 => water_heater_management::get_command_list(),
@@ -483,7 +511,6 @@ pub fn get_command_list(cluster_id: u32) -> Vec<(u32, &'static str)> {
 
 pub fn get_command_name(cluster_id: u32, cmd_id: u32) -> Option<&'static str> {
     match cluster_id {
-        0x0000 => alarm_base::get_command_name(cmd_id),
         0x0003 => identify::get_command_name(cmd_id),
         0x0004 => groups::get_command_name(cmd_id),
         0x0006 => on_off::get_command_name(cmd_id),
@@ -518,6 +545,9 @@ pub fn get_command_name(cluster_id: u32, cmd_id: u32) -> Option<&'static str> {
         0x0062 => scenes::get_command_name(cmd_id),
         0x0064 => temperature_alarm::get_command_name(cmd_id),
         0x0065 => groupcast::get_command_name(cmd_id),
+        0x0071 => resource_monitoring::get_command_name(cmd_id),
+        0x0072 => resource_monitoring::get_command_name(cmd_id),
+        0x0079 => resource_monitoring::get_command_name(cmd_id),
         0x0080 => boolean_state_configuration::get_command_name(cmd_id),
         0x0081 => valve_configuration_control::get_command_name(cmd_id),
         0x0094 => water_heater_management::get_command_name(cmd_id),
@@ -568,7 +598,6 @@ pub fn get_command_name(cluster_id: u32, cmd_id: u32) -> Option<&'static str> {
 
 pub fn get_command_schema(cluster_id: u32, cmd_id: u32) -> Option<Vec<CommandField>> {
     match cluster_id {
-        0x0000 => alarm_base::get_command_schema(cmd_id),
         0x0003 => identify::get_command_schema(cmd_id),
         0x0004 => groups::get_command_schema(cmd_id),
         0x0006 => on_off::get_command_schema(cmd_id),
@@ -603,6 +632,9 @@ pub fn get_command_schema(cluster_id: u32, cmd_id: u32) -> Option<Vec<CommandFie
         0x0062 => scenes::get_command_schema(cmd_id),
         0x0064 => temperature_alarm::get_command_schema(cmd_id),
         0x0065 => groupcast::get_command_schema(cmd_id),
+        0x0071 => resource_monitoring::get_command_schema(cmd_id),
+        0x0072 => resource_monitoring::get_command_schema(cmd_id),
+        0x0079 => resource_monitoring::get_command_schema(cmd_id),
         0x0080 => boolean_state_configuration::get_command_schema(cmd_id),
         0x0081 => valve_configuration_control::get_command_schema(cmd_id),
         0x0094 => water_heater_management::get_command_schema(cmd_id),
@@ -653,7 +685,6 @@ pub fn get_command_schema(cluster_id: u32, cmd_id: u32) -> Option<Vec<CommandFie
 
 pub fn encode_command_json(cluster_id: u32, cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
     match cluster_id {
-        0x0000 => alarm_base::encode_command_json(cmd_id, args),
         0x0003 => identify::encode_command_json(cmd_id, args),
         0x0004 => groups::encode_command_json(cmd_id, args),
         0x0006 => on_off::encode_command_json(cmd_id, args),
@@ -688,6 +719,9 @@ pub fn encode_command_json(cluster_id: u32, cmd_id: u32, args: &serde_json::Valu
         0x0062 => scenes::encode_command_json(cmd_id, args),
         0x0064 => temperature_alarm::encode_command_json(cmd_id, args),
         0x0065 => groupcast::encode_command_json(cmd_id, args),
+        0x0071 => resource_monitoring::encode_command_json(cmd_id, args),
+        0x0072 => resource_monitoring::encode_command_json(cmd_id, args),
+        0x0079 => resource_monitoring::encode_command_json(cmd_id, args),
         0x0080 => boolean_state_configuration::encode_command_json(cmd_id, args),
         0x0081 => valve_configuration_control::encode_command_json(cmd_id, args),
         0x0094 => water_heater_management::encode_command_json(cmd_id, args),
@@ -740,7 +774,6 @@ pub fn encode_command_json(cluster_id: u32, cmd_id: u32, args: &serde_json::Valu
 /// Main dispatcher for decoding event TLV values to JSON strings
 pub fn decode_event_json(cluster_id: u32, event_id: u32, tlv_value: &crate::tlv::TlvItemValue) -> String {
     match cluster_id {
-        0x0000 => alarm_base::decode_event_json(cluster_id, event_id, tlv_value),
         0x001F => acl_cluster::decode_event_json(cluster_id, event_id, tlv_value),
         0x0025 => actions_cluster::decode_event_json(cluster_id, event_id, tlv_value),
         0x0028 => basic_information_cluster::decode_event_json(cluster_id, event_id, tlv_value),
@@ -787,7 +820,6 @@ pub fn decode_event_json(cluster_id: u32, event_id: u32, tlv_value: &crate::tlv:
 /// Main dispatcher for getting event lists by cluster ID
 pub fn get_event_list(cluster_id: u32) -> Vec<(u32, &'static str)> {
     match cluster_id {
-        0x0000 => alarm_base::get_event_list(),
         0x001F => acl_cluster::get_event_list(),
         0x0025 => actions_cluster::get_event_list(),
         0x0028 => basic_information_cluster::get_event_list(),
