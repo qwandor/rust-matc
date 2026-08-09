@@ -12,6 +12,7 @@ pub mod actions_cluster;
 pub mod admin_commissioning_cluster;
 pub mod air_quality;
 pub mod alarm_base;
+pub mod ambient_context_sensing;
 pub mod application_basic;
 pub mod application_launcher;
 pub mod audio_output;
@@ -244,6 +245,7 @@ pub fn decode_attribute_json(cluster_id: u32, attribute_id: u32, tlv_value: &cra
         0x042E => concentration_measurement::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x042F => concentration_measurement::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0430 => soil_measurement::decode_attribute_json(cluster_id, attribute_id, tlv_value),
+        0x0431 => ambient_context_sensing::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0450 => network_identity_management::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0451 => wifi_network_management::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0452 => thread_border_router_management::decode_attribute_json(cluster_id, attribute_id, tlv_value),
@@ -386,6 +388,7 @@ pub fn get_attribute_list(cluster_id: u32) -> Vec<(u32, &'static str)> {
         0x042E => concentration_measurement::get_attribute_list(),
         0x042F => concentration_measurement::get_attribute_list(),
         0x0430 => soil_measurement::get_attribute_list(),
+        0x0431 => ambient_context_sensing::get_attribute_list(),
         0x0450 => network_identity_management::get_attribute_list(),
         0x0451 => wifi_network_management::get_attribute_list(),
         0x0452 => thread_border_router_management::get_attribute_list(),
@@ -805,6 +808,7 @@ pub fn decode_event_json(cluster_id: u32, event_id: u32, tlv_value: &crate::tlv:
         0x0200 => pump_configuration_control::decode_event_json(cluster_id, event_id, tlv_value),
         0x0201 => thermostat::decode_event_json(cluster_id, event_id, tlv_value),
         0x0406 => occupancy_sensing::decode_event_json(cluster_id, event_id, tlv_value),
+        0x0431 => ambient_context_sensing::decode_event_json(cluster_id, event_id, tlv_value),
         0x0505 => target_navigator::decode_event_json(cluster_id, event_id, tlv_value),
         0x0506 => media_playback::decode_event_json(cluster_id, event_id, tlv_value),
         0x050E => account_login::decode_event_json(cluster_id, event_id, tlv_value),
@@ -851,6 +855,7 @@ pub fn get_event_list(cluster_id: u32) -> Vec<(u32, &'static str)> {
         0x0200 => pump_configuration_control::get_event_list(),
         0x0201 => thermostat::get_event_list(),
         0x0406 => occupancy_sensing::get_event_list(),
+        0x0431 => ambient_context_sensing::get_event_list(),
         0x0505 => target_navigator::get_event_list(),
         0x0506 => media_playback::get_event_list(),
         0x050E => account_login::get_event_list(),

@@ -156,8 +156,6 @@ pub mod wifisecurity {
     pub const WPA2_PERSONAL: u8 = 0x08;
     /// Supports Wi-Fi using WPA3-Personal security
     pub const WPA3_PERSONAL: u8 = 0x10;
-    /// Supports Wi-Fi using Per-Device Credentials
-    pub const WPA3_MATTER_PDC: u8 = 0x20;
 }
 
 // Struct definitions
@@ -167,10 +165,6 @@ pub struct NetworkInfo {
     #[serde(serialize_with = "serialize_opt_bytes_as_hex")]
     pub network_id: Option<Vec<u8>>,
     pub connected: Option<bool>,
-    #[serde(serialize_with = "serialize_opt_bytes_as_hex")]
-    pub network_identifier: Option<Vec<u8>>,
-    #[serde(serialize_with = "serialize_opt_bytes_as_hex")]
-    pub client_identifier: Option<Vec<u8>>,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -212,14 +206,11 @@ pub fn encode_scan_networks(ssid: Option<Vec<u8>>, breadcrumb: Option<u64>) -> a
 }
 
 /// Encode AddOrUpdateWiFiNetwork command (0x02)
-pub fn encode_add_or_update_wifi_network(ssid: Vec<u8>, credentials: Vec<u8>, breadcrumb: Option<u64>, network_identity: Option<Vec<u8>>, client_identifier: Option<Vec<u8>>, possession_nonce: Option<Vec<u8>>) -> anyhow::Result<Vec<u8>> {
+pub fn encode_add_or_update_wifi_network(ssid: Vec<u8>, credentials: Vec<u8>, breadcrumb: Option<u64>) -> anyhow::Result<Vec<u8>> {
     let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
     tlv_fields.push((0, tlv::TlvItemValueEnc::OctetString(ssid)).into());
     tlv_fields.push((1, tlv::TlvItemValueEnc::OctetString(credentials)).into());
     if let Some(x) = breadcrumb { tlv_fields.push((2, tlv::TlvItemValueEnc::UInt64(x)).into()); }
-    if let Some(x) = network_identity { tlv_fields.push((3, tlv::TlvItemValueEnc::OctetString(x)).into()); }
-    if let Some(x) = client_identifier { tlv_fields.push((4, tlv::TlvItemValueEnc::OctetString(x)).into()); }
-    if let Some(x) = possession_nonce { tlv_fields.push((5, tlv::TlvItemValueEnc::OctetString(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
@@ -276,18 +267,6 @@ pub fn encode_reorder_network(network_id: Vec<u8>, network_index: u8, breadcrumb
     Ok(tlv.encode()?)
 }
 
-/// Encode QueryIdentity command (0x09)
-pub fn encode_query_identity(key_identifier: Vec<u8>, possession_nonce: Option<Vec<u8>>) -> anyhow::Result<Vec<u8>> {
-    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
-    tlv_fields.push((0, tlv::TlvItemValueEnc::OctetString(key_identifier)).into());
-    if let Some(x) = possession_nonce { tlv_fields.push((1, tlv::TlvItemValueEnc::OctetString(x)).into()); }
-    let tlv = tlv::TlvItemEnc {
-        tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
-    };
-    Ok(tlv.encode()?)
-}
-
 // Attribute decoders
 
 /// Decode MaxNetworks attribute (0x0000)
@@ -307,8 +286,6 @@ pub fn decode_networks(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec<NetworkInf
             res.push(NetworkInfo {
                 network_id: item.get_octet_string_owned(&[0]),
                 connected: item.get_bool(&[1]),
-                network_identifier: item.get_octet_string_owned(&[2]),
-                client_identifier: item.get_octet_string_owned(&[3]),
             });
         }
     }
@@ -521,7 +498,6 @@ pub fn get_command_list() -> Vec<(u32, &'static str)> {
         (0x04, "RemoveNetwork"),
         (0x06, "ConnectNetwork"),
         (0x08, "ReorderNetwork"),
-        (0x09, "QueryIdentity"),
     ]
 }
 
@@ -533,7 +509,6 @@ pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
         0x04 => Some("RemoveNetwork"),
         0x06 => Some("ConnectNetwork"),
         0x08 => Some("ReorderNetwork"),
-        0x09 => Some("QueryIdentity"),
         _ => None,
     }
 }
@@ -548,9 +523,6 @@ pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::Com
             crate::clusters::codec::CommandField { tag: 0, name: "ssid", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
             crate::clusters::codec::CommandField { tag: 1, name: "credentials", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
             crate::clusters::codec::CommandField { tag: 2, name: "breadcrumb", kind: crate::clusters::codec::FieldKind::U64, optional: true, nullable: false },
-            crate::clusters::codec::CommandField { tag: 3, name: "network_identity", kind: crate::clusters::codec::FieldKind::OctetString, optional: true, nullable: false },
-            crate::clusters::codec::CommandField { tag: 4, name: "client_identifier", kind: crate::clusters::codec::FieldKind::OctetString, optional: true, nullable: false },
-            crate::clusters::codec::CommandField { tag: 5, name: "possession_nonce", kind: crate::clusters::codec::FieldKind::OctetString, optional: true, nullable: false },
         ]),
         0x03 => Some(vec![
             crate::clusters::codec::CommandField { tag: 0, name: "operational_dataset", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
@@ -569,10 +541,6 @@ pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::Com
             crate::clusters::codec::CommandField { tag: 1, name: "network_index", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
             crate::clusters::codec::CommandField { tag: 2, name: "breadcrumb", kind: crate::clusters::codec::FieldKind::U64, optional: true, nullable: false },
         ]),
-        0x09 => Some(vec![
-            crate::clusters::codec::CommandField { tag: 0, name: "key_identifier", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
-            crate::clusters::codec::CommandField { tag: 1, name: "possession_nonce", kind: crate::clusters::codec::FieldKind::OctetString, optional: true, nullable: false },
-        ]),
         _ => None,
     }
 }
@@ -588,10 +556,7 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
         let ssid = crate::clusters::codec::json_util::get_octstr(args, "ssid")?;
         let credentials = crate::clusters::codec::json_util::get_octstr(args, "credentials")?;
         let breadcrumb = crate::clusters::codec::json_util::get_opt_u64(args, "breadcrumb")?;
-        let network_identity = crate::clusters::codec::json_util::get_opt_octstr(args, "network_identity")?;
-        let client_identifier = crate::clusters::codec::json_util::get_opt_octstr(args, "client_identifier")?;
-        let possession_nonce = crate::clusters::codec::json_util::get_opt_octstr(args, "possession_nonce")?;
-        encode_add_or_update_wifi_network(ssid, credentials, breadcrumb, network_identity, client_identifier, possession_nonce)
+        encode_add_or_update_wifi_network(ssid, credentials, breadcrumb)
         }
         0x03 => {
         let operational_dataset = crate::clusters::codec::json_util::get_octstr(args, "operational_dataset")?;
@@ -614,11 +579,6 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
         let breadcrumb = crate::clusters::codec::json_util::get_opt_u64(args, "breadcrumb")?;
         encode_reorder_network(network_id, network_index, breadcrumb)
         }
-        0x09 => {
-        let key_identifier = crate::clusters::codec::json_util::get_octstr(args, "key_identifier")?;
-        let possession_nonce = crate::clusters::codec::json_util::get_opt_octstr(args, "possession_nonce")?;
-        encode_query_identity(key_identifier, possession_nonce)
-        }
         _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
     }
 }
@@ -636,10 +596,6 @@ pub struct NetworkConfigResponse {
     pub networking_status: Option<NetworkCommissioningStatus>,
     pub debug_text: Option<String>,
     pub network_index: Option<u8>,
-    #[serde(serialize_with = "serialize_opt_bytes_as_hex")]
-    pub client_identity: Option<Vec<u8>>,
-    #[serde(serialize_with = "serialize_opt_bytes_as_hex")]
-    pub possession_signature: Option<Vec<u8>>,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -647,14 +603,6 @@ pub struct ConnectNetworkResponse {
     pub networking_status: Option<NetworkCommissioningStatus>,
     pub debug_text: Option<String>,
     pub error_value: Option<i32>,
-}
-
-#[derive(Debug, serde::Serialize)]
-pub struct QueryIdentityResponse {
-    #[serde(serialize_with = "serialize_opt_bytes_as_hex")]
-    pub identity: Option<Vec<u8>>,
-    #[serde(serialize_with = "serialize_opt_bytes_as_hex")]
-    pub possession_signature: Option<Vec<u8>>,
 }
 
 // Command response decoders
@@ -718,8 +666,6 @@ pub fn decode_network_config_response(inp: &tlv::TlvItemValue) -> anyhow::Result
                 networking_status: item.get_int(&[0]).and_then(|v| NetworkCommissioningStatus::from_u8(v as u8)),
                 debug_text: item.get_string_owned(&[1]),
                 network_index: item.get_int(&[2]).map(|v| v as u8),
-                client_identity: item.get_octet_string_owned(&[3]),
-                possession_signature: item.get_octet_string_owned(&[4]),
         })
     } else {
         Err(anyhow::anyhow!("Expected struct fields"))
@@ -740,19 +686,6 @@ pub fn decode_connect_network_response(inp: &tlv::TlvItemValue) -> anyhow::Resul
     }
 }
 
-/// Decode QueryIdentityResponse command response (0A)
-pub fn decode_query_identity_response(inp: &tlv::TlvItemValue) -> anyhow::Result<QueryIdentityResponse> {
-    if let tlv::TlvItemValue::List(_fields) = inp {
-        let item = tlv::TlvItem { tag: 0, value: inp.clone() };
-        Ok(QueryIdentityResponse {
-                identity: item.get_octet_string_owned(&[0]),
-                possession_signature: item.get_octet_string_owned(&[1]),
-        })
-    } else {
-        Err(anyhow::anyhow!("Expected struct fields"))
-    }
-}
-
 // Typed facade (invokes + reads)
 
 /// Invoke `ScanNetworks` command on cluster `Network Commissioning`.
@@ -762,8 +695,8 @@ pub async fn scan_networks(conn: &crate::controller::Connection, endpoint: u16, 
 }
 
 /// Invoke `AddOrUpdateWiFiNetwork` command on cluster `Network Commissioning`.
-pub async fn add_or_update_wifi_network(conn: &crate::controller::Connection, endpoint: u16, ssid: Vec<u8>, credentials: Vec<u8>, breadcrumb: Option<u64>, network_identity: Option<Vec<u8>>, client_identifier: Option<Vec<u8>>, possession_nonce: Option<Vec<u8>>) -> anyhow::Result<NetworkConfigResponse> {
-    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_NETWORK_COMMISSIONING, crate::clusters::defs::CLUSTER_NETWORK_COMMISSIONING_CMD_ID_ADDORUPDATEWIFINETWORK, &encode_add_or_update_wifi_network(ssid, credentials, breadcrumb, network_identity, client_identifier, possession_nonce)?).await?;
+pub async fn add_or_update_wifi_network(conn: &crate::controller::Connection, endpoint: u16, ssid: Vec<u8>, credentials: Vec<u8>, breadcrumb: Option<u64>) -> anyhow::Result<NetworkConfigResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_NETWORK_COMMISSIONING, crate::clusters::defs::CLUSTER_NETWORK_COMMISSIONING_CMD_ID_ADDORUPDATEWIFINETWORK, &encode_add_or_update_wifi_network(ssid, credentials, breadcrumb)?).await?;
     decode_network_config_response(&tlv)
 }
 
@@ -789,12 +722,6 @@ pub async fn connect_network(conn: &crate::controller::Connection, endpoint: u16
 pub async fn reorder_network(conn: &crate::controller::Connection, endpoint: u16, network_id: Vec<u8>, network_index: u8, breadcrumb: Option<u64>) -> anyhow::Result<NetworkConfigResponse> {
     let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_NETWORK_COMMISSIONING, crate::clusters::defs::CLUSTER_NETWORK_COMMISSIONING_CMD_ID_REORDERNETWORK, &encode_reorder_network(network_id, network_index, breadcrumb)?).await?;
     decode_network_config_response(&tlv)
-}
-
-/// Invoke `QueryIdentity` command on cluster `Network Commissioning`.
-pub async fn query_identity(conn: &crate::controller::Connection, endpoint: u16, key_identifier: Vec<u8>, possession_nonce: Option<Vec<u8>>) -> anyhow::Result<QueryIdentityResponse> {
-    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_NETWORK_COMMISSIONING, crate::clusters::defs::CLUSTER_NETWORK_COMMISSIONING_CMD_ID_QUERYIDENTITY, &encode_query_identity(key_identifier, possession_nonce)?).await?;
-    decode_query_identity_response(&tlv)
 }
 
 /// Read `MaxNetworks` attribute from cluster `Network Commissioning`.

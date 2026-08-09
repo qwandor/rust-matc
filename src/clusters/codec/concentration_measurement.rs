@@ -138,36 +138,36 @@ impl From<MeasurementUnit> for u8 {
 // Attribute decoders
 
 /// Decode MeasuredValue attribute (0x0000)
-pub fn decode_measured_value(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<u8>> {
-    if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(Some(*v as u8))
+pub fn decode_measured_value(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<f32>> {
+    if let tlv::TlvItemValue::Float(v) = inp {
+        Ok(Some(*v as f32))
     } else {
         Ok(None)
     }
 }
 
 /// Decode MinMeasuredValue attribute (0x0001)
-pub fn decode_min_measured_value(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<u8>> {
-    if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(Some(*v as u8))
+pub fn decode_min_measured_value(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<f32>> {
+    if let tlv::TlvItemValue::Float(v) = inp {
+        Ok(Some(*v as f32))
     } else {
         Ok(None)
     }
 }
 
 /// Decode MaxMeasuredValue attribute (0x0002)
-pub fn decode_max_measured_value(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<u8>> {
-    if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(Some(*v as u8))
+pub fn decode_max_measured_value(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<f32>> {
+    if let tlv::TlvItemValue::Float(v) = inp {
+        Ok(Some(*v as f32))
     } else {
         Ok(None)
     }
 }
 
 /// Decode PeakMeasuredValue attribute (0x0003)
-pub fn decode_peak_measured_value(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<u8>> {
-    if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(Some(*v as u8))
+pub fn decode_peak_measured_value(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<f32>> {
+    if let tlv::TlvItemValue::Float(v) = inp {
+        Ok(Some(*v as f32))
     } else {
         Ok(None)
     }
@@ -183,9 +183,9 @@ pub fn decode_peak_measured_value_window(inp: &tlv::TlvItemValue) -> anyhow::Res
 }
 
 /// Decode AverageMeasuredValue attribute (0x0005)
-pub fn decode_average_measured_value(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<u8>> {
-    if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(Some(*v as u8))
+pub fn decode_average_measured_value(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<f32>> {
+    if let tlv::TlvItemValue::Float(v) = inp {
+        Ok(Some(*v as f32))
     } else {
         Ok(None)
     }
@@ -201,11 +201,11 @@ pub fn decode_average_measured_value_window(inp: &tlv::TlvItemValue) -> anyhow::
 }
 
 /// Decode Uncertainty attribute (0x0007)
-pub fn decode_uncertainty(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
-    if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(*v as u8)
+pub fn decode_uncertainty(inp: &tlv::TlvItemValue) -> anyhow::Result<f32> {
+    if let tlv::TlvItemValue::Float(v) = inp {
+        Ok(*v as f32)
     } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
+        Err(anyhow::anyhow!("Expected Float32"))
     }
 }
 
@@ -348,25 +348,25 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
 // Typed facade (invokes + reads)
 
 /// Read `MeasuredValue` attribute from cluster `Radon Concentration Measurement`.
-pub async fn read_measured_value(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+pub async fn read_measured_value(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<f32>> {
     let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_RADON_CONCENTRATION_MEASUREMENT, crate::clusters::defs::CLUSTER_RADON_CONCENTRATION_MEASUREMENT_ATTR_ID_MEASUREDVALUE).await?;
     decode_measured_value(&tlv)
 }
 
 /// Read `MinMeasuredValue` attribute from cluster `Radon Concentration Measurement`.
-pub async fn read_min_measured_value(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+pub async fn read_min_measured_value(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<f32>> {
     let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_RADON_CONCENTRATION_MEASUREMENT, crate::clusters::defs::CLUSTER_RADON_CONCENTRATION_MEASUREMENT_ATTR_ID_MINMEASUREDVALUE).await?;
     decode_min_measured_value(&tlv)
 }
 
 /// Read `MaxMeasuredValue` attribute from cluster `Radon Concentration Measurement`.
-pub async fn read_max_measured_value(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+pub async fn read_max_measured_value(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<f32>> {
     let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_RADON_CONCENTRATION_MEASUREMENT, crate::clusters::defs::CLUSTER_RADON_CONCENTRATION_MEASUREMENT_ATTR_ID_MAXMEASUREDVALUE).await?;
     decode_max_measured_value(&tlv)
 }
 
 /// Read `PeakMeasuredValue` attribute from cluster `Radon Concentration Measurement`.
-pub async fn read_peak_measured_value(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+pub async fn read_peak_measured_value(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<f32>> {
     let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_RADON_CONCENTRATION_MEASUREMENT, crate::clusters::defs::CLUSTER_RADON_CONCENTRATION_MEASUREMENT_ATTR_ID_PEAKMEASUREDVALUE).await?;
     decode_peak_measured_value(&tlv)
 }
@@ -378,7 +378,7 @@ pub async fn read_peak_measured_value_window(conn: &crate::controller::Connectio
 }
 
 /// Read `AverageMeasuredValue` attribute from cluster `Radon Concentration Measurement`.
-pub async fn read_average_measured_value(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+pub async fn read_average_measured_value(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<f32>> {
     let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_RADON_CONCENTRATION_MEASUREMENT, crate::clusters::defs::CLUSTER_RADON_CONCENTRATION_MEASUREMENT_ATTR_ID_AVERAGEMEASUREDVALUE).await?;
     decode_average_measured_value(&tlv)
 }
@@ -390,7 +390,7 @@ pub async fn read_average_measured_value_window(conn: &crate::controller::Connec
 }
 
 /// Read `Uncertainty` attribute from cluster `Radon Concentration Measurement`.
-pub async fn read_uncertainty(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+pub async fn read_uncertainty(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<f32> {
     let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_RADON_CONCENTRATION_MEASUREMENT, crate::clusters::defs::CLUSTER_RADON_CONCENTRATION_MEASUREMENT_ATTR_ID_UNCERTAINTY).await?;
     decode_uncertainty(&tlv)
 }

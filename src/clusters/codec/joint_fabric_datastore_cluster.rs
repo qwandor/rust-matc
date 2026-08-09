@@ -54,7 +54,6 @@ impl From<DatastoreAccessControlEntryAuthMode> for u8 {
 pub enum DatastoreAccessControlEntryPrivilege {
     /// Can read and observe all (except Access Control Cluster)
     View = 1,
-    Proxyview = 2,
     /// View privileges, and can perform the primary function of this Node (except Access Control Cluster)
     Operate = 3,
     /// Operate privileges, and can modify persistent configuration of this Node (except Access Control Cluster)
@@ -68,7 +67,6 @@ impl DatastoreAccessControlEntryPrivilege {
     pub fn from_u8(value: u8) -> Option<Self> {
         match value {
             1 => Some(DatastoreAccessControlEntryPrivilege::View),
-            2 => Some(DatastoreAccessControlEntryPrivilege::Proxyview),
             3 => Some(DatastoreAccessControlEntryPrivilege::Operate),
             4 => Some(DatastoreAccessControlEntryPrivilege::Manage),
             5 => Some(DatastoreAccessControlEntryPrivilege::Administer),
@@ -240,7 +238,6 @@ pub struct DatastoreEndpointEntry {
     pub endpoint_id: Option<u16>,
     pub node_id: Option<u64>,
     pub friendly_name: Option<String>,
-    pub status_entry: Option<DatastoreStatusEntry>,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -403,24 +400,24 @@ pub fn encode_add_admin(node_id: u64, friendly_name: String, vendor_id: u16, ica
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (1, tlv::TlvItemValueEnc::UInt64(node_id)).into(),
-        (2, tlv::TlvItemValueEnc::String(friendly_name)).into(),
-        (3, tlv::TlvItemValueEnc::UInt16(vendor_id)).into(),
-        (4, tlv::TlvItemValueEnc::OctetString(icac)).into(),
+        (0, tlv::TlvItemValueEnc::UInt64(node_id)).into(),
+        (1, tlv::TlvItemValueEnc::String(friendly_name)).into(),
+        (2, tlv::TlvItemValueEnc::UInt16(vendor_id)).into(),
+        (3, tlv::TlvItemValueEnc::OctetString(icac)).into(),
         ]),
     };
     Ok(tlv.encode()?)
 }
 
 /// Encode UpdateAdmin command (0x07)
-pub fn encode_update_admin(node_id: Option<u64>, friendly_name: Option<String>, icac: Option<Vec<u8>>) -> anyhow::Result<Vec<u8>> {
+pub fn encode_update_admin(node_id: u64, friendly_name: Option<String>, icac: Option<Vec<u8>>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::UInt64(node_id)).into());
+    if let Some(x) = friendly_name { tlv_fields.push((1, tlv::TlvItemValueEnc::String(x)).into()); }
+    if let Some(x) = icac { tlv_fields.push((2, tlv::TlvItemValueEnc::OctetString(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt64(node_id.unwrap_or(0))).into(),
-        (1, tlv::TlvItemValueEnc::String(friendly_name.unwrap_or("".to_string()))).into(),
-        (2, tlv::TlvItemValueEnc::OctetString(icac.unwrap_or(vec![]))).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
@@ -675,12 +672,12 @@ pub fn decode_node_list(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec<Datastore
     if let tlv::TlvItemValue::List(v) = inp {
         for item in v {
             res.push(DatastoreNodeInformationEntry {
-                node_id: item.get_int(&[1]),
-                friendly_name: item.get_string_owned(&[2]),
+                node_id: item.get_int(&[0]),
+                friendly_name: item.get_string_owned(&[1]),
                 commissioning_status_entry: {
-                    if let Some(nested_tlv) = item.get(&[3]) {
+                    if let Some(nested_tlv) = item.get(&[2]) {
                         if let tlv::TlvItemValue::List(_) = nested_tlv {
-                            let nested_item = tlv::TlvItem { tag: 3, value: nested_tlv.clone() };
+                            let nested_item = tlv::TlvItem { tag: 2, value: nested_tlv.clone() };
                             Some(DatastoreStatusEntry {
                 state: nested_item.get_int(&[0]).and_then(|v| DatastoreState::from_u8(v as u8)),
                 update_timestamp: nested_item.get_int(&[1]),
@@ -705,10 +702,10 @@ pub fn decode_admin_list(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec<Datastor
     if let tlv::TlvItemValue::List(v) = inp {
         for item in v {
             res.push(DatastoreAdministratorInformationEntry {
-                node_id: item.get_int(&[1]),
-                friendly_name: item.get_string_owned(&[2]),
-                vendor_id: item.get_int(&[3]).map(|v| v as u16),
-                icac: item.get_octet_string_owned(&[4]),
+                node_id: item.get_int(&[0]),
+                friendly_name: item.get_string_owned(&[1]),
+                vendor_id: item.get_int(&[2]).map(|v| v as u16),
+                icac: item.get_octet_string_owned(&[3]),
             });
         }
     }
@@ -916,22 +913,6 @@ pub fn decode_node_endpoint_list(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec<
                 endpoint_id: item.get_int(&[0]).map(|v| v as u16),
                 node_id: item.get_int(&[1]),
                 friendly_name: item.get_string_owned(&[2]),
-                status_entry: {
-                    if let Some(nested_tlv) = item.get(&[3]) {
-                        if let tlv::TlvItemValue::List(_) = nested_tlv {
-                            let nested_item = tlv::TlvItem { tag: 3, value: nested_tlv.clone() };
-                            Some(DatastoreStatusEntry {
-                state: nested_item.get_int(&[0]).and_then(|v| DatastoreState::from_u8(v as u8)),
-                update_timestamp: nested_item.get_int(&[1]),
-                failure_code: nested_item.get_int(&[2]).map(|v| v as u8),
-                            })
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    }
-                },
             });
         }
     }
@@ -1138,7 +1119,7 @@ pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::Com
             crate::clusters::codec::CommandField { tag: 2, name: "group_key_set_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: true },
             crate::clusters::codec::CommandField { tag: 3, name: "group_cat", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: true },
             crate::clusters::codec::CommandField { tag: 4, name: "group_cat_version", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: true },
-            crate::clusters::codec::CommandField { tag: 5, name: "group_permission", kind: crate::clusters::codec::FieldKind::Enum { name: "DatastoreAccessControlEntryPrivilege", variants: &[(1, "View"), (2, "Proxyview"), (3, "Operate"), (4, "Manage"), (5, "Administer")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 5, name: "group_permission", kind: crate::clusters::codec::FieldKind::Enum { name: "DatastoreAccessControlEntryPrivilege", variants: &[(1, "View"), (3, "Operate"), (4, "Manage"), (5, "Administer")] }, optional: false, nullable: false },
         ]),
         0x04 => Some(vec![
             crate::clusters::codec::CommandField { tag: 0, name: "group_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
@@ -1146,21 +1127,21 @@ pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::Com
             crate::clusters::codec::CommandField { tag: 2, name: "group_key_set_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: true },
             crate::clusters::codec::CommandField { tag: 3, name: "group_cat", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: true },
             crate::clusters::codec::CommandField { tag: 4, name: "group_cat_version", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: true },
-            crate::clusters::codec::CommandField { tag: 5, name: "group_permission", kind: crate::clusters::codec::FieldKind::Enum { name: "DatastoreAccessControlEntryPrivilege", variants: &[(1, "View"), (2, "Proxyview"), (3, "Operate"), (4, "Manage"), (5, "Administer")] }, optional: false, nullable: true },
+            crate::clusters::codec::CommandField { tag: 5, name: "group_permission", kind: crate::clusters::codec::FieldKind::Enum { name: "DatastoreAccessControlEntryPrivilege", variants: &[(1, "View"), (3, "Operate"), (4, "Manage"), (5, "Administer")] }, optional: false, nullable: true },
         ]),
         0x05 => Some(vec![
             crate::clusters::codec::CommandField { tag: 0, name: "group_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
         ]),
         0x06 => Some(vec![
-            crate::clusters::codec::CommandField { tag: 1, name: "node_id", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: false },
-            crate::clusters::codec::CommandField { tag: 2, name: "friendly_name", kind: crate::clusters::codec::FieldKind::String, optional: false, nullable: false },
-            crate::clusters::codec::CommandField { tag: 3, name: "vendor_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
-            crate::clusters::codec::CommandField { tag: 4, name: "icac", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 0, name: "node_id", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "friendly_name", kind: crate::clusters::codec::FieldKind::String, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "vendor_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "icac", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
         ]),
         0x07 => Some(vec![
-            crate::clusters::codec::CommandField { tag: 0, name: "node_id", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: true },
-            crate::clusters::codec::CommandField { tag: 1, name: "friendly_name", kind: crate::clusters::codec::FieldKind::String, optional: false, nullable: true },
-            crate::clusters::codec::CommandField { tag: 2, name: "icac", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: true },
+            crate::clusters::codec::CommandField { tag: 0, name: "node_id", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "friendly_name", kind: crate::clusters::codec::FieldKind::String, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "icac", kind: crate::clusters::codec::FieldKind::OctetString, optional: true, nullable: false },
         ]),
         0x08 => Some(vec![
             crate::clusters::codec::CommandField { tag: 0, name: "node_id", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: false },
@@ -1258,7 +1239,7 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
         encode_add_admin(node_id, friendly_name, vendor_id, icac)
         }
         0x07 => {
-        let node_id = crate::clusters::codec::json_util::get_opt_u64(args, "node_id")?;
+        let node_id = crate::clusters::codec::json_util::get_u64(args, "node_id")?;
         let friendly_name = crate::clusters::codec::json_util::get_opt_string(args, "friendly_name")?;
         let icac = crate::clusters::codec::json_util::get_opt_octstr(args, "icac")?;
         encode_update_admin(node_id, friendly_name, icac)
@@ -1365,7 +1346,7 @@ pub async fn add_admin(conn: &crate::controller::Connection, endpoint: u16, node
 }
 
 /// Invoke `UpdateAdmin` command on cluster `Joint Fabric Datastore`.
-pub async fn update_admin(conn: &crate::controller::Connection, endpoint: u16, node_id: Option<u64>, friendly_name: Option<String>, icac: Option<Vec<u8>>) -> anyhow::Result<()> {
+pub async fn update_admin(conn: &crate::controller::Connection, endpoint: u16, node_id: u64, friendly_name: Option<String>, icac: Option<Vec<u8>>) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_DATASTORE, crate::clusters::defs::CLUSTER_JOINT_FABRIC_DATASTORE_CMD_ID_UPDATEADMIN, &encode_update_admin(node_id, friendly_name, icac)?).await?;
     Ok(())
 }

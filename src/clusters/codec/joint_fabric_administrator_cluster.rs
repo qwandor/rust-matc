@@ -133,7 +133,7 @@ pub fn encode_add_icac(icac_value: Vec<u8>) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (1, tlv::TlvItemValueEnc::OctetString(icac_value)).into(),
+        (0, tlv::TlvItemValueEnc::OctetString(icac_value)).into(),
         ]),
     };
     Ok(tlv.encode()?)
@@ -244,7 +244,7 @@ pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::Com
     match cmd_id {
         0x00 => Some(vec![]),
         0x02 => Some(vec![
-            crate::clusters::codec::CommandField { tag: 1, name: "icac_value", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 0, name: "icac_value", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
         ]),
         0x04 => Some(vec![
             crate::clusters::codec::CommandField { tag: 0, name: "commissioning_timeout", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },

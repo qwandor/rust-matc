@@ -63,10 +63,6 @@ pub enum NodeOperationalCertStatus {
     Tablefull = 5,
     /// Invalid CaseAdminSubject field for an AddNOC command.
     Invalidadminsubject = 6,
-    /// Reserved for future use
-    Reservedforfutureuse = 7,
-    /// Reserved for future use
-    Reservedforfutureuse8 = 8,
     /// Trying to AddNOC instead of UpdateNOC against an existing Fabric.
     Fabricconflict = 9,
     /// Label already exists on another Fabric.
@@ -86,8 +82,6 @@ impl NodeOperationalCertStatus {
             4 => Some(NodeOperationalCertStatus::Missingcsr),
             5 => Some(NodeOperationalCertStatus::Tablefull),
             6 => Some(NodeOperationalCertStatus::Invalidadminsubject),
-            7 => Some(NodeOperationalCertStatus::Reservedforfutureuse),
-            8 => Some(NodeOperationalCertStatus::Reservedforfutureuse8),
             9 => Some(NodeOperationalCertStatus::Fabricconflict),
             10 => Some(NodeOperationalCertStatus::Labelconflict),
             11 => Some(NodeOperationalCertStatus::Invalidfabricindex),

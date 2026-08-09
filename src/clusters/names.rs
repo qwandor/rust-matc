@@ -7,6 +7,7 @@ pub fn get_cluster_name(id: u32) -> Option<&'static str> {
         0x0025 => Some("Actions"),
         0x003C => Some("Administrator Commissioning"),
         0x005B => Some("Air Quality"),
+        0x0431 => Some("Ambient Context Sensing"),
         0x050D => Some("Application Basic"),
         0x050C => Some("Application Launcher"),
         0x050B => Some("Audio Output"),

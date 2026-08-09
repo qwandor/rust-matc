@@ -7,6 +7,7 @@ from typing import Dict, Optional, TYPE_CHECKING
 from ..naming import convert_to_snake_case, escape_rust_keyword
 from ..type_mapping import MatterType
 from .tlv_helpers import (
+    bind_item_var,
     _generate_struct_field_assignments,
     _generate_list_decoder,
     _generate_single_value_decoder,
@@ -119,10 +120,11 @@ class AttributeField:
                 # Generate field assignments
                 field_assignments = _generate_struct_field_assignments(struct.fields, structs, enums, "item", bitmaps)
                 assignments_str = "\n".join(field_assignments)
+                item_var = bind_item_var("item", field_assignments)
 
                 decode_logic = f'''    let mut res = Vec::new();
     if let tlv::TlvItemValue::List(v) = inp {{
-        for item in v {{
+        for {item_var} in v {{
             res.push({struct_name} {{
 {assignments_str}
             }});
@@ -157,12 +159,13 @@ class AttributeField:
                 # Generate field assignments for the struct
                 field_assignments = _generate_struct_field_assignments(struct.fields, structs, enums, "item", bitmaps)
                 assignments_str = "\n".join(field_assignments)
+                item_var = bind_item_var("item", field_assignments)
 
                 if self.nullable:
                     # For nullable structs, handle null values and wrap result in Some()
                     decode_logic = f'''    if let tlv::TlvItemValue::List(_fields) = inp {{
         // Struct with fields
-        let item = tlv::TlvItem {{ tag: 0, value: inp.clone() }};
+        let {item_var} = tlv::TlvItem {{ tag: 0, value: inp.clone() }};
         Ok(Some({struct_name} {{
 {assignments_str}
         }}))
@@ -177,7 +180,7 @@ class AttributeField:
                     # For non-nullable structs
                     decode_logic = f'''    if let tlv::TlvItemValue::List(_fields) = inp {{
         // Struct with fields
-        let item = tlv::TlvItem {{ tag: 0, value: inp.clone() }};
+        let {item_var} = tlv::TlvItem {{ tag: 0, value: inp.clone() }};
         Ok({struct_name} {{
 {assignments_str}
         }})

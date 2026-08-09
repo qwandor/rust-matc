@@ -16,6 +16,20 @@ if TYPE_CHECKING:
 
 
 
+def bind_item_var(item_var: str, assignments: List[str]) -> str:
+    """Return the binding name to use for a TLV item variable.
+
+    Struct fields with cross-cluster type references are skipped, which can leave
+    a struct with no decodable fields at all. In that case the generated
+    assignments never mention the item variable and Rust warns about an unused
+    binding, so prefix it with an underscore.
+    """
+    body = "\n".join(assignments)
+    if re.search(rf'\b{re.escape(item_var)}\b', body):
+        return item_var
+    return f'_{item_var}'
+
+
 def _get_value_cast_expr(value_var: str, matter_type: str, enums: Optional[Dict[str, 'MatterEnum']] = None, bitmaps: Optional[Dict[str, 'MatterBitmap']] = None) -> str:
     """Generate appropriate cast expression for a value based on its Matter type.
 
@@ -354,11 +368,13 @@ def _generate_struct_field_assignments(struct_fields: List[Tuple[int, str, str, 
             if entry_type.endswith('Struct') and structs and entry_type in structs:
                 target_struct = structs[entry_type]
                 struct_rust_name = target_struct.get_rust_struct_name()
-                nested_assignments_str = "\n".join(_generate_struct_field_assignments(target_struct.fields, structs, enums, "list_item", bitmaps))
+                nested_assignments = _generate_struct_field_assignments(target_struct.fields, structs, enums, "list_item", bitmaps)
+                nested_assignments_str = "\n".join(nested_assignments)
+                list_item_var = bind_item_var("list_item", nested_assignments)
                 field_assignments.append(f'''                {rust_field_name}: {{
                     if let Some(tlv::TlvItemValue::List(l)) = {item_var}.get(&[{field_id}]) {{
                         let mut items = Vec::new();
-                        for list_item in l {{
+                        for {list_item_var} in l {{
                             items.push({struct_rust_name} {{
 {nested_assignments_str}
                             }});
@@ -417,11 +433,13 @@ def _generate_struct_field_assignments(struct_fields: List[Tuple[int, str, str, 
             # In-cluster struct - generate nested struct decoding
             target_struct = structs[field_type]
             struct_rust_name = target_struct.get_rust_struct_name()
-            nested_assignments_str = "\n".join(_generate_struct_field_assignments(target_struct.fields, structs, enums, "nested_item", bitmaps))
+            nested_assignments = _generate_struct_field_assignments(target_struct.fields, structs, enums, "nested_item", bitmaps)
+            nested_assignments_str = "\n".join(nested_assignments)
+            nested_item_var = bind_item_var("nested_item", nested_assignments)
             field_assignments.append(f'''                {rust_field_name}: {{
                     if let Some(nested_tlv) = {item_var}.get(&[{field_id}]) {{
                         if let tlv::TlvItemValue::List(_) = nested_tlv {{
-                            let nested_item = tlv::TlvItem {{ tag: {field_id}, value: nested_tlv.clone() }};
+                            let {nested_item_var} = tlv::TlvItem {{ tag: {field_id}, value: nested_tlv.clone() }};
                             Some({struct_rust_name} {{
 {nested_assignments_str}
                             }})

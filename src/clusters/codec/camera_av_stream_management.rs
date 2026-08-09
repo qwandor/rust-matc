@@ -1034,6 +1034,15 @@ pub fn decode_status_light_brightness(inp: &tlv::TlvItemValue) -> anyhow::Result
     }
 }
 
+/// Decode ImageRotationDiscreteAngles attribute (0x0029)
+pub fn decode_image_rotation_discrete_angles(inp: &tlv::TlvItemValue) -> anyhow::Result<u16> {
+    if let tlv::TlvItemValue::Int(v) = inp {
+        Ok(*v as u16)
+    } else {
+        Err(anyhow::anyhow!("Expected UInt16"))
+    }
+}
+
 
 // JSON dispatcher function
 
@@ -1299,6 +1308,12 @@ pub fn decode_attribute_json(cluster_id: u32, attribute_id: u32, tlv_value: &cra
                 Err(e) => format!("{{\"error\": \"{}\"}}", e),
             }
         }
+        0x0029 => {
+            match decode_image_rotation_discrete_angles(tlv_value) {
+                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
+                Err(e) => format!("{{\"error\": \"{}\"}}", e),
+            }
+        }
         _ => format!("{{\"error\": \"Unknown attribute ID: {}\"}}", attribute_id),
     }
 }
@@ -1350,6 +1365,7 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
         (0x0026, "LocalSnapshotRecordingEnabled"),
         (0x0027, "StatusLightEnabled"),
         (0x0028, "StatusLightBrightness"),
+        (0x0029, "ImageRotationDiscreteAngles"),
     ]
 }
 
@@ -1889,5 +1905,11 @@ pub async fn read_status_light_enabled(conn: &crate::controller::Connection, end
 pub async fn read_status_light_brightness(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
     let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_ATTR_ID_STATUSLIGHTBRIGHTNESS).await?;
     decode_status_light_brightness(&tlv)
+}
+
+/// Read `ImageRotationDiscreteAngles` attribute from cluster `Camera AV Stream Management`.
+pub async fn read_image_rotation_discrete_angles(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_ATTR_ID_IMAGEROTATIONDISCRETEANGLES).await?;
+    decode_image_rotation_discrete_angles(&tlv)
 }
 

@@ -323,11 +323,11 @@ pub fn decode_sampled_position(inp: &tlv::TlvItemValue) -> anyhow::Result<Option
 }
 
 /// Decode PlaybackSpeed attribute (0x0004)
-pub fn decode_playback_speed(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
-    if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(*v as u8)
+pub fn decode_playback_speed(inp: &tlv::TlvItemValue) -> anyhow::Result<f32> {
+    if let tlv::TlvItemValue::Float(v) = inp {
+        Ok(*v as f32)
     } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
+        Err(anyhow::anyhow!("Expected Float32"))
     }
 }
 
@@ -860,7 +860,7 @@ pub async fn read_sampled_position(conn: &crate::controller::Connection, endpoin
 }
 
 /// Read `PlaybackSpeed` attribute from cluster `Media Playback`.
-pub async fn read_playback_speed(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+pub async fn read_playback_speed(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<f32> {
     let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_MEDIA_PLAYBACK, crate::clusters::defs::CLUSTER_MEDIA_PLAYBACK_ATTR_ID_PLAYBACKSPEED).await?;
     decode_playback_speed(&tlv)
 }
@@ -907,7 +907,7 @@ pub struct StateChangedEvent {
     pub start_time: Option<u64>,
     pub duration: Option<u64>,
     pub sampled_position: Option<PlaybackPosition>,
-    pub playback_speed: Option<u8>,
+    pub playback_speed: Option<f32>,
     pub seek_range_end: Option<u64>,
     pub seek_range_start: Option<u64>,
     #[serde(serialize_with = "serialize_opt_bytes_as_hex")]
@@ -940,7 +940,7 @@ pub fn decode_state_changed_event(inp: &tlv::TlvItemValue) -> anyhow::Result<Sta
                         None
                     }
                 },
-                                playback_speed: item.get_int(&[4]).map(|v| v as u8),
+                                playback_speed: item.get_float(&[4]).map(|v| v as f32),
                                 seek_range_end: item.get_int(&[5]),
                                 seek_range_start: item.get_int(&[6]),
                                 data: item.get_octet_string_owned(&[7]),

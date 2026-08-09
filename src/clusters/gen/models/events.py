@@ -3,6 +3,7 @@
 from typing import List
 from .field import MatterField
 from .tlv_helpers import (
+    bind_item_var,
     _generate_rust_struct_definition,
     _generate_struct_field_assignments
 )
@@ -67,7 +68,7 @@ class MatterEvent:
         lines.append(f"/// Decode {self.name} event ({self.id}, priority: {self.priority})")
         lines.append(f"pub fn {func_name}(inp: &tlv::TlvItemValue) -> anyhow::Result<{struct_name}> {{")
         lines.append("    if let tlv::TlvItemValue::List(_fields) = inp {")
-        lines.append("        let item = tlv::TlvItem { tag: 0, value: inp.clone() };")
+        lines.append(f"        let {bind_item_var('item', field_assignments)} = tlv::TlvItem {{ tag: 0, value: inp.clone() }};")
         lines.append(f"        Ok({struct_name} {{")
 
         for assignment in field_assignments:

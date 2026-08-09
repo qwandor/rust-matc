@@ -10,9 +10,6 @@ use anyhow;
 use serde_json;
 
 
-// Import serialization helpers for octet strings
-use crate::clusters::helpers::{serialize_opt_bytes_as_hex};
-
 // Enum definitions
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -283,10 +280,6 @@ pub struct CMAFContainerOptions {
     pub chunk_duration: Option<u16>,
     pub session_group: Option<u8>,
     pub track_name: Option<String>,
-    #[serde(serialize_with = "serialize_opt_bytes_as_hex")]
-    pub cenc_key: Option<Vec<u8>>,
-    #[serde(serialize_with = "serialize_opt_bytes_as_hex")]
-    pub cenc_key_id: Option<Vec<u8>>,
     pub metadata_enabled: Option<bool>,
 }
 
@@ -399,8 +392,6 @@ pub fn encode_allocate_push_transport(transport_options: TransportOptions) -> an
                     if let Some(x) = inner.chunk_duration { cmaf_container_options_nested_fields.push((2, tlv::TlvItemValueEnc::UInt16(x)).into()); }
                     if let Some(x) = inner.session_group { cmaf_container_options_nested_fields.push((3, tlv::TlvItemValueEnc::UInt8(x)).into()); }
                     if let Some(x) = inner.track_name { cmaf_container_options_nested_fields.push((4, tlv::TlvItemValueEnc::String(x.clone())).into()); }
-                    if let Some(x) = inner.cenc_key { cmaf_container_options_nested_fields.push((5, tlv::TlvItemValueEnc::OctetString(x.clone())).into()); }
-                    if let Some(x) = inner.cenc_key_id { cmaf_container_options_nested_fields.push((6, tlv::TlvItemValueEnc::OctetString(x.clone())).into()); }
                     if let Some(x) = inner.metadata_enabled { cmaf_container_options_nested_fields.push((7, tlv::TlvItemValueEnc::Bool(x)).into()); }
                     container_options_nested_fields.push((1, tlv::TlvItemValueEnc::StructInvisible(cmaf_container_options_nested_fields)).into());
                 }
@@ -489,8 +480,6 @@ pub fn encode_modify_push_transport(connection_id: u16, transport_options: Trans
                     if let Some(x) = inner.chunk_duration { cmaf_container_options_nested_fields.push((2, tlv::TlvItemValueEnc::UInt16(x)).into()); }
                     if let Some(x) = inner.session_group { cmaf_container_options_nested_fields.push((3, tlv::TlvItemValueEnc::UInt8(x)).into()); }
                     if let Some(x) = inner.track_name { cmaf_container_options_nested_fields.push((4, tlv::TlvItemValueEnc::String(x.clone())).into()); }
-                    if let Some(x) = inner.cenc_key { cmaf_container_options_nested_fields.push((5, tlv::TlvItemValueEnc::OctetString(x.clone())).into()); }
-                    if let Some(x) = inner.cenc_key_id { cmaf_container_options_nested_fields.push((6, tlv::TlvItemValueEnc::OctetString(x.clone())).into()); }
                     if let Some(x) = inner.metadata_enabled { cmaf_container_options_nested_fields.push((7, tlv::TlvItemValueEnc::Bool(x)).into()); }
                     container_options_nested_fields.push((1, tlv::TlvItemValueEnc::StructInvisible(cmaf_container_options_nested_fields)).into());
                 }
@@ -668,8 +657,6 @@ pub fn decode_current_connections(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec
                 chunk_duration: nested_item.get_int(&[2]).map(|v| v as u16),
                 session_group: nested_item.get_int(&[3]).map(|v| v as u8),
                 track_name: nested_item.get_string_owned(&[4]),
-                cenc_key: nested_item.get_octet_string_owned(&[5]),
-                cenc_key_id: nested_item.get_octet_string_owned(&[6]),
                 metadata_enabled: nested_item.get_bool(&[7]),
                             })
                         } else {
@@ -953,8 +940,6 @@ pub fn decode_allocate_push_transport_response(inp: &tlv::TlvItemValue) -> anyho
                 chunk_duration: nested_item.get_int(&[2]).map(|v| v as u16),
                 session_group: nested_item.get_int(&[3]).map(|v| v as u8),
                 track_name: nested_item.get_string_owned(&[4]),
-                cenc_key: nested_item.get_octet_string_owned(&[5]),
-                cenc_key_id: nested_item.get_octet_string_owned(&[6]),
                 metadata_enabled: nested_item.get_bool(&[7]),
                             })
                         } else {
@@ -1109,8 +1094,6 @@ pub fn decode_find_transport_response(inp: &tlv::TlvItemValue) -> anyhow::Result
                 chunk_duration: nested_item.get_int(&[2]).map(|v| v as u16),
                 session_group: nested_item.get_int(&[3]).map(|v| v as u8),
                 track_name: nested_item.get_string_owned(&[4]),
-                cenc_key: nested_item.get_octet_string_owned(&[5]),
-                cenc_key_id: nested_item.get_octet_string_owned(&[6]),
                 metadata_enabled: nested_item.get_bool(&[7]),
                             })
                         } else {

@@ -197,8 +197,8 @@ pub struct ContentSearch {
 
 #[derive(Debug, serde::Serialize)]
 pub struct Dimension {
-    pub width: Option<u8>,
-    pub height: Option<u8>,
+    pub width: Option<f64>,
+    pub height: Option<f64>,
     pub metric: Option<MetricType>,
 }
 

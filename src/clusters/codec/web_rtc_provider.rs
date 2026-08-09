@@ -10,20 +10,6 @@ use anyhow;
 use serde_json;
 
 
-// Import serialization helpers for octet strings
-use crate::clusters::helpers::{serialize_opt_bytes_as_hex};
-
-// Struct definitions
-
-#[derive(Debug, serde::Serialize)]
-pub struct SFrame {
-    pub cipher_suite: Option<u16>,
-    #[serde(serialize_with = "serialize_opt_bytes_as_hex")]
-    pub base_key: Option<Vec<u8>>,
-    #[serde(serialize_with = "serialize_opt_bytes_as_hex")]
-    pub kid: Option<Vec<u8>>,
-}
-
 // Command encoders
 
 /// Parameters for SolicitOffer command
@@ -34,7 +20,6 @@ pub struct SolicitOfferParams {
     pub audio_stream_id: Option<u16>,
     pub ice_transport_policy: Option<String>,
     pub metadata_enabled: bool,
-    pub s_frame_config: Option<SFrame>,
     pub video_streams: Option<Vec<u16>>,
     pub audio_streams: Option<Vec<u16>>,
 }
@@ -48,14 +33,6 @@ pub fn encode_solicit_offer(params: SolicitOfferParams) -> anyhow::Result<Vec<u8
     tlv_fields.push((3, tlv::TlvItemValueEnc::UInt16(params.audio_stream_id.unwrap_or(0))).into());
     if let Some(x) = params.ice_transport_policy { tlv_fields.push((5, tlv::TlvItemValueEnc::String(x)).into()); }
     tlv_fields.push((6, tlv::TlvItemValueEnc::Bool(params.metadata_enabled)).into());
-    if let Some(s_frame_config) = params.s_frame_config {
-        // Encode struct SFrameStruct
-        let mut s_frame_config_fields = Vec::new();
-        if let Some(x) = s_frame_config.cipher_suite { s_frame_config_fields.push((0, tlv::TlvItemValueEnc::UInt16(x)).into()); }
-        if let Some(x) = s_frame_config.base_key { s_frame_config_fields.push((1, tlv::TlvItemValueEnc::OctetString(x.clone())).into()); }
-        if let Some(x) = s_frame_config.kid { s_frame_config_fields.push((2, tlv::TlvItemValueEnc::OctetString(x.clone())).into()); }
-        tlv_fields.push((7, tlv::TlvItemValueEnc::StructInvisible(s_frame_config_fields)).into());
-    }
     if let Some(video_streams) = params.video_streams {
         tlv_fields.push((8, tlv::TlvItemValueEnc::StructAnon(video_streams.into_iter().map(|v| (0, tlv::TlvItemValueEnc::UInt16(v)).into()).collect())).into());
     }
@@ -79,7 +56,6 @@ pub struct ProvideOfferParams {
     pub audio_stream_id: Option<u16>,
     pub ice_transport_policy: Option<String>,
     pub metadata_enabled: bool,
-    pub s_frame_config: Option<SFrame>,
     pub video_streams: Option<Vec<u16>>,
     pub audio_streams: Option<Vec<u16>>,
 }
@@ -95,14 +71,6 @@ pub fn encode_provide_offer(params: ProvideOfferParams) -> anyhow::Result<Vec<u8
     tlv_fields.push((5, tlv::TlvItemValueEnc::UInt16(params.audio_stream_id.unwrap_or(0))).into());
     if let Some(x) = params.ice_transport_policy { tlv_fields.push((7, tlv::TlvItemValueEnc::String(x)).into()); }
     tlv_fields.push((8, tlv::TlvItemValueEnc::Bool(params.metadata_enabled)).into());
-    if let Some(s_frame_config) = params.s_frame_config {
-        // Encode struct SFrameStruct
-        let mut s_frame_config_fields = Vec::new();
-        if let Some(x) = s_frame_config.cipher_suite { s_frame_config_fields.push((0, tlv::TlvItemValueEnc::UInt16(x)).into()); }
-        if let Some(x) = s_frame_config.base_key { s_frame_config_fields.push((1, tlv::TlvItemValueEnc::OctetString(x.clone())).into()); }
-        if let Some(x) = s_frame_config.kid { s_frame_config_fields.push((2, tlv::TlvItemValueEnc::OctetString(x.clone())).into()); }
-        tlv_fields.push((9, tlv::TlvItemValueEnc::StructInvisible(s_frame_config_fields)).into());
-    }
     if let Some(video_streams) = params.video_streams {
         tlv_fields.push((10, tlv::TlvItemValueEnc::StructAnon(video_streams.into_iter().map(|v| (0, tlv::TlvItemValueEnc::UInt16(v)).into()).collect())).into());
     }
@@ -237,7 +205,6 @@ pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::Com
             crate::clusters::codec::CommandField { tag: 3, name: "audio_stream_id", kind: crate::clusters::codec::FieldKind::U16, optional: true, nullable: true },
             crate::clusters::codec::CommandField { tag: 5, name: "ice_transport_policy", kind: crate::clusters::codec::FieldKind::String, optional: true, nullable: false },
             crate::clusters::codec::CommandField { tag: 6, name: "metadata_enabled", kind: crate::clusters::codec::FieldKind::Bool, optional: false, nullable: false },
-            crate::clusters::codec::CommandField { tag: 7, name: "s_frame_config", kind: crate::clusters::codec::FieldKind::Struct { name: "SFrameStruct" }, optional: true, nullable: false },
             crate::clusters::codec::CommandField { tag: 8, name: "video_streams", kind: crate::clusters::codec::FieldKind::List { entry_type: "uint16" }, optional: true, nullable: false },
             crate::clusters::codec::CommandField { tag: 9, name: "audio_streams", kind: crate::clusters::codec::FieldKind::List { entry_type: "uint16" }, optional: true, nullable: false },
         ]),
@@ -250,7 +217,6 @@ pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::Com
             crate::clusters::codec::CommandField { tag: 5, name: "audio_stream_id", kind: crate::clusters::codec::FieldKind::U16, optional: true, nullable: true },
             crate::clusters::codec::CommandField { tag: 7, name: "ice_transport_policy", kind: crate::clusters::codec::FieldKind::String, optional: true, nullable: false },
             crate::clusters::codec::CommandField { tag: 8, name: "metadata_enabled", kind: crate::clusters::codec::FieldKind::Bool, optional: false, nullable: false },
-            crate::clusters::codec::CommandField { tag: 9, name: "s_frame_config", kind: crate::clusters::codec::FieldKind::Struct { name: "SFrameStruct" }, optional: true, nullable: false },
             crate::clusters::codec::CommandField { tag: 10, name: "video_streams", kind: crate::clusters::codec::FieldKind::List { entry_type: "uint16" }, optional: true, nullable: false },
             crate::clusters::codec::CommandField { tag: 11, name: "audio_streams", kind: crate::clusters::codec::FieldKind::List { entry_type: "uint16" }, optional: true, nullable: false },
         ]),

@@ -42,7 +42,7 @@ class MatterStruct:
 
     def generate_decode_function(self, is_list: bool = False, structs: Optional[Dict[str, 'MatterStruct']] = None, enums: Optional[Dict[str, 'MatterEnum']] = None, bitmaps: Optional[Dict[str, 'MatterBitmap']] = None) -> str:
         """Generate decode function for this struct."""
-        from .tlv_helpers import _generate_struct_field_assignments
+        from .tlv_helpers import _generate_struct_field_assignments, bind_item_var
 
         struct_name = self.get_rust_struct_name()
         func_name = f"decode_{convert_to_snake_case(self.name)}"
@@ -63,11 +63,12 @@ class MatterStruct:
             self.fields, structs, enums, "item", bitmaps
         )
         assignments_str = "\n".join(field_assignments)
+        item_var = bind_item_var("item", field_assignments)
 
         if is_list:
             decode_logic = f'''    let mut res = Vec::new();
     if let tlv::TlvItemValue::List(v) = inp {{
-        for item in v {{
+        for {item_var} in v {{
             res.push({struct_name} {{
 {assignments_str}
             }});
@@ -75,9 +76,9 @@ class MatterStruct:
     }}
     Ok(res)'''
         else:
-            decode_logic = f'''    if let tlv::TlvItemValue::List(fields) = inp {{
+            decode_logic = f'''    if let tlv::TlvItemValue::List(_fields) = inp {{
         // Single struct with fields
-        let item = tlv::TlvItem {{ tag: 0, value: inp.clone() }};
+        let {item_var} = tlv::TlvItem {{ tag: 0, value: inp.clone() }};
         Ok({struct_name} {{
 {assignments_str}
         }})
