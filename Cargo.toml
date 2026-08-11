@@ -40,6 +40,7 @@ btleplug = { version="0.12", optional = true }
 uuid = { version = "1", optional = true }
 futures = { version = "0.3", optional = true }
 if-addrs = { version = "0.13", features = ["link-local"] }
+thiserror = "2.0.20"
 
 # used by generated code
 serde_json = "1.0.*"

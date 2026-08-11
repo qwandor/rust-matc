@@ -1,6 +1,6 @@
 //! Handling of certificates in Matter format
 
-use anyhow::{Context, Result};
+use const_oid::ObjectIdentifier;
 use p256::NistP256;
 use x509_cert::{
     certificate::CertificateInner,
@@ -8,16 +8,20 @@ use x509_cert::{
 };
 
 use crate::{
+    cert_x509::CertificateError,
     tlv::{self, TlvBuffer},
     util::cryptoutil,
 };
 
-fn decode_dn_value(dn: &x509_cert::der::Any) -> Result<u64> {
+fn decode_dn_value(dn: &x509_cert::der::Any) -> Result<u64, CertificateError> {
     let valstr = dn.decode_as::<String>()?;
     Ok(u64::from_str_radix(&valstr, 16)?)
 }
 
-fn dn_to_matter(dn: &x509_cert::name::RdnSequence, tlv: &mut TlvBuffer) -> Result<()> {
+fn dn_to_matter(
+    dn: &x509_cert::name::RdnSequence,
+    tlv: &mut TlvBuffer,
+) -> Result<(), CertificateError> {
     for extra in &dn.0 {
         for e2 in extra.0.as_slice() {
             if e2.oid == const_oid::ObjectIdentifier::new_unwrap("1.3.6.1.4.1.37244.1.1") {
@@ -34,21 +38,25 @@ fn dn_to_matter(dn: &x509_cert::name::RdnSequence, tlv: &mut TlvBuffer) -> Resul
     Ok(())
 }
 
-fn extract_extension(cert: &x509_cert::TbsCertificate, oid: &str) -> Result<Vec<u8>> {
+fn extract_extension(
+    cert: &x509_cert::TbsCertificate,
+    oid: &str,
+) -> Result<Vec<u8>, CertificateError> {
+    let oid = ObjectIdentifier::new_unwrap(oid);
     let extensions = cert
         .extensions
         .as_ref()
-        .context("can't get cert extensions")?;
+        .ok_or(CertificateError::ExtensionMissing(oid))?;
     for extension in extensions {
-        if extension.extn_id == const_oid::ObjectIdentifier::new_unwrap(oid) {
+        if extension.extn_id == oid {
             let v = extension.extn_value.as_bytes().to_vec();
             return Ok(v);
         }
     }
-    Err(anyhow::anyhow!(format!("can't find extension {:?}", oid)))
+    Err(CertificateError::ExtensionMissing(oid))
 }
 
-pub fn get_subject_node_id_from_x509(fname: &str) -> Result<u64> {
+pub fn get_subject_node_id_from_x509(fname: &str) -> Result<u64, CertificateError> {
     let cert_file = std::fs::read_to_string(fname)?;
     let cert = x509_cert::Certificate::from_pem(cert_file)?;
     for extra in cert.tbs_certificate.subject.0 {
@@ -58,24 +66,30 @@ pub fn get_subject_node_id_from_x509(fname: &str) -> Result<u64> {
             }
         }
     }
-    Err(anyhow::anyhow!("matter subject/node not found in x509"))
+    Err(CertificateError::SubjectNodeMissing)
 }
 
 /// Convert certificate in PEM file to matter format
 /// PEM file must contain x509 certificate compatible with matter
-pub fn convert_x509_to_matter(fname: &str, ca_pubkey: &[u8]) -> Result<Vec<u8>> {
+pub fn convert_x509_to_matter(fname: &str, ca_pubkey: &[u8]) -> Result<Vec<u8>, CertificateError> {
     let x509_raw = cryptoutil::read_data_from_pem(fname)?;
     convert_x509_bytes_to_matter(&x509_raw, ca_pubkey)
 }
 
 /// Convert certificate from X509/DER array of bytes to matter format
 /// x509 certificate must be compatible with matter
-pub fn convert_x509_bytes_to_matter(bytes: &[u8], ca_pubkey: &[u8]) -> Result<Vec<u8>> {
+pub fn convert_x509_bytes_to_matter(
+    bytes: &[u8],
+    ca_pubkey: &[u8],
+) -> Result<Vec<u8>, CertificateError> {
     let x509 = x509_cert::Certificate::from_der(bytes)?;
     convert_x509_to_matter_int(&x509, ca_pubkey)
 }
 
-fn convert_x509_to_matter_int(cert: &CertificateInner, ca_pubkey: &[u8]) -> Result<Vec<u8>> {
+fn convert_x509_to_matter_int(
+    cert: &CertificateInner,
+    ca_pubkey: &[u8],
+) -> Result<Vec<u8>, CertificateError> {
     let mut enc = tlv::TlvBuffer::new();
     enc.write_anon_struct()?;
     enc.write_octetstring(1, cert.tbs_certificate.serial_number.as_bytes())?;
@@ -108,7 +122,7 @@ fn convert_x509_to_matter_int(cert: &CertificateInner, ca_pubkey: &[u8]) -> Resu
         .subject_public_key_info
         .subject_public_key
         .as_bytes()
-        .context("can't extract subject public key")?;
+        .ok_or(CertificateError::SubjectPublicKeyMissing)?;
 
     enc.write_octetstring(9, subject_public_key)?;
 
@@ -147,12 +161,7 @@ fn convert_x509_to_matter_int(cert: &CertificateInner, ca_pubkey: &[u8]) -> Resu
                 "1.3.6.1.5.5.7.3.2" => {
                     enc.write_uint8_notag(2)?;
                 } // client-auth
-                _ => {
-                    return Err(anyhow::anyhow!(
-                        "unsupported oid in extendedKeyUsage {:?}",
-                        u.to_string()
-                    ))
-                }
+                _ => return Err(CertificateError::UnsupportedOid(u)),
             };
         }
         enc.write_struct_end()?;
@@ -174,7 +183,7 @@ fn convert_x509_to_matter_int(cert: &CertificateInner, ca_pubkey: &[u8]) -> Resu
     let sig = cert
         .signature
         .as_bytes()
-        .context("can't get signature from x509")?;
+        .ok_or(CertificateError::Signature)?;
 
     let sig = ecdsa::Signature::<NistP256>::from_der(sig)?;
 

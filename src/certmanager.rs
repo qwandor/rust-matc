@@ -53,9 +53,11 @@ impl FileCertManager {
         let (fabric_id, ipk_epoch_key) = if std::path::Path::new(&json_path).exists() {
             let s = std::fs::read_to_string(&json_path)
                 .context(format!("can't read from {}", json_path))?;
-            let m: Metadata = serde_json::from_str(&s)
-                .context(format!("invalid JSON in {}", json_path))?;
-            let fid = m.fabric_id.parse::<u64>()
+            let m: Metadata =
+                serde_json::from_str(&s).context(format!("invalid JSON in {}", json_path))?;
+            let fid = m
+                .fabric_id
+                .parse::<u64>()
                 .context("invalid fabric_id in metadata.json")?;
             let ipk = hex::decode(&m.ipk_epoch_key)
                 .context("invalid ipk_epoch_key hex in metadata.json")?;
@@ -64,7 +66,10 @@ impl FileCertManager {
             let s = std::fs::read_to_string(&pem_path)
                 .context(format!("can't read from {}", pem_path))?;
             let fid = s.trim().parse::<u64>()?;
-            (fid, vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf])
+            (
+                fid,
+                vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf],
+            )
         };
 
         Ok(Arc::new(Self {
@@ -166,7 +171,7 @@ impl FileCertManager {
 
 impl CertManager for FileCertManager {
     fn get_ca_cert(&self) -> Result<Vec<u8>> {
-        cryptoutil::read_data_from_pem(&self.ca_cert_fname())
+        Ok(cryptoutil::read_data_from_pem(&self.ca_cert_fname())?)
     }
 
     fn get_ca_key(&self) -> Result<p256::SecretKey> {
@@ -174,7 +179,7 @@ impl CertManager for FileCertManager {
     }
 
     fn get_user_cert(&self, id: u64) -> Result<Vec<u8>> {
-        cryptoutil::read_data_from_pem(&self.user_cert_fname(id))
+        Ok(cryptoutil::read_data_from_pem(&self.user_cert_fname(id))?)
     }
 
     fn get_user_key(&self, id: u64) -> Result<p256::SecretKey> {

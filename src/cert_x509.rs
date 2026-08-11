@@ -1,14 +1,87 @@
 //! Handling of x509 certificate compatible with matter
 
+use crate::{
+    tlv,
+    util::{asn1, cryptoutil},
+};
 use byteorder::WriteBytesExt;
-use std::time::{Duration, SystemTime};
+use const_oid::ObjectIdentifier;
+use p256::elliptic_curve;
+use pem::PemError;
+use std::{
+    io,
+    num::ParseIntError,
+    str::Utf8Error,
+    time::{Duration, SystemTime},
+};
+use thiserror::Error;
+use x509_cert::der::{self, asn1::UtcTime};
 
-use crate::tlv;
-use crate::util::asn1;
-use crate::util::cryptoutil;
-use anyhow::{Context, Result};
+#[derive(Debug, Error)]
+#[non_exhaustive]
+pub enum CertificateError {
+    #[error("IO error: {0}")]
+    Io(#[from] io::Error),
+    #[error("Can't read file {filename}: {source}")]
+    FileRead {
+        filename: String,
+        #[source]
+        source: io::Error,
+    },
+    #[error("DER error: {0}")]
+    Der(#[from] der::Error),
+    #[error("PEM error: {0}")]
+    Pem(#[from] PemError),
+    #[error("ECDSA error: {0}")]
+    Ecdsa(#[from] ecdsa::Error),
+    #[error("Elliptic curve error: {0}")]
+    EllipticCurve(#[from] elliptic_curve::Error),
+    #[error("UTF-8 error: {0}")]
+    Utf8(#[from] Utf8Error),
+    #[error("Error parsing integer: {0}")]
+    ParseInt(#[from] ParseIntError),
+    #[error("Time continuity error")]
+    TimeContinuity,
+    #[error("Matter certificate serial missing")]
+    SerialMissing,
+    #[error("Matter certificate issuer CA ID missing")]
+    IssuerCaIdMissing,
+    #[error("Matter certificate not_before missing")]
+    NotBeforeMissing,
+    #[error("Matter certificate not_after missing")]
+    NotAfterMissing,
+    #[error("Matter certificate public key missing")]
+    PublicKeyMissing,
+    #[error("Matter certificate subject key ID missing")]
+    SubjectKeyIdMissing,
+    #[error("Matter certificate authority key ID missing")]
+    AuthorityKeyIdMissing,
+    #[error("Matter certificate subject CA ID missing")]
+    SubjectCaIdMissing,
+    #[error("Matter certificate subject node ID missing")]
+    SubjectNodeIdMissing,
+    #[error("Matter certificate subject fabric ID missing")]
+    SubjectFabricIdMissing,
+    #[error("Certificate time out of range")]
+    TimeOutOfRange,
+    #[error("Unsupported OID in extendedKeyUsage: {0}")]
+    UnsupportedOid(ObjectIdentifier),
+    #[error("Can't find extension {0}")]
+    ExtensionMissing(ObjectIdentifier),
+    #[error("Matter subject/node not found in X509")]
+    SubjectNodeMissing,
+    #[error("Can't get signature from X509")]
+    Signature,
+    #[error("Subject public key missing")]
+    SubjectPublicKeyMissing,
+}
 
-fn add_ext(encoder: &mut asn1::Encoder, oid: &str, critical: bool, value: &[u8]) -> Result<()> {
+fn add_ext(
+    encoder: &mut asn1::Encoder,
+    oid: &str,
+    critical: bool,
+    value: &[u8],
+) -> Result<(), CertificateError> {
     encoder.start_seq(0x30)?;
     encoder.write_oid(oid)?;
     if critical {
@@ -23,8 +96,8 @@ fn encode_nodeid(id: u64) -> String {
     format!("{:0>16X}", id)
 }
 
-fn systemtime_to_x509_time(st: std::time::SystemTime) -> Result<String> {
-    let der_datetime = x509_cert::der::asn1::UtcTime::from_system_time(st)?;
+fn systemtime_to_x509_time(st: std::time::SystemTime) -> Result<String, CertificateError> {
+    let der_datetime = UtcTime::from_system_time(st)?;
     let mut v = Vec::new();
     x509_cert::der::EncodeValue::encode_value(&der_datetime, &mut v)?;
     Ok(std::str::from_utf8(&v)?.to_owned())
@@ -42,7 +115,7 @@ pub(crate) const OID_CE_BASIC_CONSTRAINTS: &str = "2.5.29.19";
 pub(crate) const OID_CE_EXT_KEU_USAGE: &str = "2.5.29.37";
 pub(crate) const OID_CE_AUTHORITY_KEY_IDENTIFIER: &str = "2.5.29.35";
 
-fn add_rdn(encoder: &mut asn1::Encoder, oid: &str, id: u64) -> Result<()> {
+fn add_rdn(encoder: &mut asn1::Encoder, oid: &str, id: u64) -> Result<(), CertificateError> {
     encoder.start_seq(0x31)?; //rdn
     encoder.start_seq(0x30)?; //atv
     encoder.write_oid(oid)?;
@@ -52,10 +125,10 @@ fn add_rdn(encoder: &mut asn1::Encoder, oid: &str, id: u64) -> Result<()> {
     Ok(())
 }
 
-fn epoch2000_to_x509_time(secs: u32) -> Result<String> {
+fn epoch2000_to_x509_time(secs: u32) -> Result<String, CertificateError> {
     let st = SystemTime::UNIX_EPOCH
         .checked_add(Duration::from_secs(946684800 + secs as u64))
-        .context("certificate time out of range")?;
+        .ok_or(CertificateError::TimeOutOfRange)?;
     systemtime_to_x509_time(st)
 }
 
@@ -65,26 +138,30 @@ fn epoch2000_to_x509_time(secs: u32) -> Result<String> {
 /// Only certificates produced by [encode_x509] (this library's own CA) round-trip exactly;
 /// certificates issued by other stacks may use encodings this reconstruction does not cover,
 /// in which case signature verification will fail.
-pub(crate) fn matter_cert_to_x509_tbs(matter_cert: &[u8]) -> Result<Vec<u8>> {
+pub(crate) fn matter_cert_to_x509_tbs(matter_cert: &[u8]) -> Result<Vec<u8>, CertificateError> {
     let cert = tlv::decode_tlv(matter_cert)?;
     let serial = cert
         .get_octet_string(&[1])
-        .context("matter cert: serial missing")?;
+        .ok_or(CertificateError::SerialMissing)?;
     let issuer_ca_id = cert
         .get_int(&[3, 20])
-        .context("matter cert: issuer ca id missing")?;
-    let not_before = cert.get_int(&[4]).context("matter cert: not_before missing")? as u32;
-    let not_after = cert.get_int(&[5]).context("matter cert: not_after missing")? as u32;
+        .ok_or(CertificateError::IssuerCaIdMissing)?;
+    let not_before = cert
+        .get_int(&[4])
+        .ok_or(CertificateError::NotBeforeMissing)? as u32;
+    let not_after = cert
+        .get_int(&[5])
+        .ok_or(CertificateError::NotAfterMissing)? as u32;
     let public_key = cert
         .get_octet_string(&[9])
-        .context("matter cert: public key missing")?;
+        .ok_or(CertificateError::PublicKeyMissing)?;
     let is_ca = cert.get_bool(&[10, 1, 1]).unwrap_or(false);
     let subject_key_id = cert
         .get_octet_string(&[10, 4])
-        .context("matter cert: subject key id missing")?;
+        .ok_or(CertificateError::SubjectKeyIdMissing)?;
     let authority_key_id = cert
         .get_octet_string(&[10, 5])
-        .context("matter cert: authority key id missing")?;
+        .ok_or(CertificateError::AuthorityKeyIdMissing)?;
 
     let mut encoder = asn1::Encoder::new();
     encoder.start_seq(0x30)?;
@@ -112,15 +189,15 @@ pub(crate) fn matter_cert_to_x509_tbs(matter_cert: &[u8]) -> Result<Vec<u8>> {
     if is_ca {
         let subject_ca_id = cert
             .get_int(&[6, 20])
-            .context("matter cert: subject ca id missing")?;
+            .ok_or(CertificateError::SubjectCaIdMissing)?;
         add_rdn(&mut encoder, OID_MATTER_DN_CA, subject_ca_id)?;
     } else {
         let node_id = cert
             .get_int(&[6, 17])
-            .context("matter cert: subject node id missing")?;
+            .ok_or(CertificateError::SubjectNodeIdMissing)?;
         let fabric_id = cert
             .get_int(&[6, 21])
-            .context("matter cert: subject fabric id missing")?;
+            .ok_or(CertificateError::SubjectFabricIdMissing)?;
         add_rdn(&mut encoder, OID_MATTER_DN_NODE, node_id)?;
         add_rdn(&mut encoder, OID_MATTER_DN_FABRIC, fabric_id)?;
     }
@@ -206,7 +283,7 @@ pub fn encode_x509(
     ca_id: u64,
     ca_private: &p256::SecretKey,
     ca: bool,
-) -> Result<Vec<u8>> {
+) -> Result<Vec<u8>, CertificateError> {
     let mut encoder = asn1::Encoder::new();
     encoder.start_seq(0x30)?;
     encoder.start_seq(0x30)?;
@@ -231,7 +308,7 @@ pub fn encode_x509(
     encoder.write_string_with_tag(0x17, &systemtime_to_x509_time(now)?)?;
     let not_after = now
         .checked_add(Duration::from_secs(60 * 60 * 24 * 100))
-        .context("time continuity error")?;
+        .ok_or(CertificateError::TimeContinuity)?;
     encoder.write_string_with_tag(0x17, &systemtime_to_x509_time(not_after)?)?;
     encoder.end_seq();
 
@@ -363,7 +440,7 @@ mod tests {
     }
 
     #[test]
-    fn test_matter_cert_to_x509_tbs_roundtrip() -> Result<()> {
+    fn test_matter_cert_to_x509_tbs_roundtrip() -> Result<(), CertificateError> {
         let ca_secret = p256::SecretKey::random(&mut rand::thread_rng());
         let ca_public = ca_secret.public_key().to_sec1_bytes();
         for is_ca in [false, true] {
@@ -380,7 +457,11 @@ mod tests {
                 _ => panic!("unsupported DER length"),
             };
             let expected_tbs = der_element(&x509[header..]);
-            assert_eq!(tbs, expected_tbs, "reconstructed TBS must match original (is_ca={})", is_ca);
+            assert_eq!(
+                tbs, expected_tbs,
+                "reconstructed TBS must match original (is_ca={})",
+                is_ca
+            );
 
             let cert_tlv = tlv::decode_tlv(&matter)?;
             let sig = cert_tlv.get_octet_string(&[11]).unwrap();

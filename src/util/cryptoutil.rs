@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 
+use crate::cert_x509::CertificateError;
 use aes::cipher::crypto_common;
 use anyhow::{Context, Result};
-
 use hmac::Mac;
 use sha1::Sha1;
 use sha2::{Digest, Sha256};
@@ -72,34 +72,37 @@ pub fn aes128_ccm_decrypt(
 }
 
 pub fn read_private_key_from_pem(fname: &str) -> Result<p256::SecretKey> {
-    let file_contents = std::fs::read_to_string(fname)
-    .context(format!("can't read file {}", fname))?;
+    let file_contents =
+        std::fs::read_to_string(fname).context(format!("can't read file {}", fname))?;
     Ok(p256::SecretKey::from_sec1_pem(&file_contents)?)
 }
 pub fn read_private_key_bytes_from_pem(fname: &str) -> Result<Vec<u8>> {
-    let file_contents = std::fs::read_to_string(fname)
-    .context(format!("can't read file {}", fname))?;
+    let file_contents =
+        std::fs::read_to_string(fname).context(format!("can't read file {}", fname))?;
     Ok(pem::parse(file_contents)?.contents().to_vec())
 }
 
 pub fn read_signing_key_from_pem(fname: &str) -> Result<ecdsa::SigningKey<p256::NistP256>> {
-    let file_contents = std::fs::read_to_string(fname)
-    .context(format!("can't read file {}", fname))?;
+    let file_contents =
+        std::fs::read_to_string(fname).context(format!("can't read file {}", fname))?;
     Ok(ecdsa::SigningKey::from(p256::SecretKey::from_sec1_pem(
         &file_contents,
     )?))
 }
 
 pub fn read_pub_key_from_pem(fname: &str) -> Result<Vec<u8>> {
-    let file_contents = std::fs::read_to_string(fname)
-    .context(format!("can't read file {}", fname))?;
+    let file_contents =
+        std::fs::read_to_string(fname).context(format!("can't read file {}", fname))?;
     let secretkey = p256::SecretKey::from_sec1_pem(&file_contents)?;
     Ok(secretkey.public_key().to_sec1_bytes().to_vec())
 }
 
-pub fn read_data_from_pem(fname: &str) -> Result<Vec<u8>> {
-    let file_contents = std::fs::read_to_string(fname)
-    .context(format!("can't read file {}", fname))?;
+pub fn read_data_from_pem(fname: &str) -> Result<Vec<u8>, CertificateError> {
+    let file_contents =
+        std::fs::read_to_string(fname).map_err(|source| CertificateError::FileRead {
+            filename: fname.to_owned(),
+            source,
+        })?;
     Ok(pem::parse(file_contents)?.contents().to_vec())
 }
 
